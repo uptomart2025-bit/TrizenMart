@@ -7,10 +7,16 @@ import { PlusCircle, Trash2, Package, RefreshCw, Layers, TrendingUp, Truck, Chec
 export default function AdminDashboard() {
   const { isAdmin, products, orders, fetchProducts, fetchOrders } = useApp();
   const navigate = useNavigate();
+  const [rawTitle, setRawTitle] = useState('');
   const [newProduct, setNewProduct] = useState({
     name: '',
     sku: '',
-    category: '',
+    category: 'Phone Case',
+    deviceBrand: '',
+    deviceModel: '',
+    caseType: '',
+    material: '',
+    features: [],
     price: '',
     description: '',
     image: '',
@@ -23,15 +29,118 @@ export default function AdminDashboard() {
     }
   }, [isAdmin]);
 
+  const parseProductTitle = (title) => {
+    const normalized = title.trim();
+    const brands = ['Apple', 'Samsung', 'Google', 'Nothing', 'Infinix', 'Tecno', 'OnePlus', 'Baseus'];
+    const brandMatch = brands.find((brand) => new RegExp(`\\b${brand}\\b`, 'i').test(normalized));
+
+    const parsed = {
+      deviceBrand: brandMatch || '',
+      deviceModel: '',
+      caseType: '',
+      material: '',
+      features: [],
+    };
+
+    const modelMatch = brandMatch
+      ? normalized.match(new RegExp(`${brandMatch}\\s+([^\\-\\|\\,]+)`, 'i'))
+      : null;
+
+    if (modelMatch && modelMatch[1]) {
+      parsed.deviceModel = modelMatch[1].trim();
+    } else {
+      const splitByDash = normalized.split(/\\s-\\s|\\s-\\s*/).map((part) => part.trim()).filter(Boolean);
+      if (splitByDash.length > 1 && brandMatch && splitByDash[0].includes(brandMatch)) {
+        parsed.deviceModel = splitByDash[0].replace(new RegExp(`\\b${brandMatch}\\b`, 'i'), '').trim();
+      }
+    }
+
+    if (/premium.*metal/i.test(normalized) || /metal case/i.test(normalized)) {
+      parsed.caseType = 'Premium Metal Case';
+    } else if (/printed.*glass/i.test(normalized) || /glass soft bumper/i.test(normalized)) {
+      parsed.caseType = 'Printed Glass Soft Bumper';
+    } else if (/grip.*armor/i.test(normalized)) {
+      parsed.caseType = 'Grip Max Armor';
+    } else if (/clear.*air.*armor/i.test(normalized)) {
+      parsed.caseType = 'Clear Air Armor';
+    } else if (/shockproof|shock proof/i.test(normalized)) {
+      parsed.caseType = 'Military-Grade Shockproof Case';
+    } else if (/case/i.test(normalized)) {
+      parsed.caseType = 'Premium Phone Case';
+    }
+
+    if (/tempered glass/i.test(normalized)) {
+      parsed.material = 'Tempered Glass';
+    } else if (/liquid silicon/i.test(normalized)) {
+      parsed.material = 'Liquid Silicon';
+    } else if (/thermoplastic/i.test(normalized)) {
+      parsed.material = 'Thermoplastic';
+    } else if (/tpu/i.test(normalized)) {
+      parsed.material = 'TPU';
+    } else if (/silicon/i.test(normalized)) {
+      parsed.material = 'Liquid Silicon';
+    } else if (/glass/i.test(normalized)) {
+      parsed.material = 'Tempered Glass';
+    } else if (/metal/i.test(normalized)) {
+      parsed.material = 'Metal';
+    }
+
+    if (/magsafe/i.test(normalized)) parsed.features.push('MagSafe Supported');
+    if (/lens protector/i.test(normalized)) parsed.features.push('Lens Protector Built-in');
+    if (/military-grade|shockproof|shock proof/i.test(normalized)) parsed.features.push('Military-Grade Shockproof');
+    if (/magnetic|wireless/i.test(normalized)) parsed.features.push('Wireless Ready');
+    if (/blue marble|marble/i.test(normalized)) parsed.features.push('Signature Surface Print');
+
+    return parsed;
+  };
+
+  const handleRawTitleChange = (event) => {
+    const value = event.target.value;
+    setRawTitle(value);
+    const parsed = parseProductTitle(value);
+
+    setNewProduct((current) => ({
+      ...current,
+      name: value,
+      sku: current.sku || value.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, ''),
+      deviceBrand: parsed.deviceBrand,
+      deviceModel: parsed.deviceModel,
+      caseType: parsed.caseType,
+      material: parsed.material,
+      features: parsed.features,
+    }));
+  };
+
   const handleCreateProduct = async (event) => {
     event.preventDefault();
     try {
+      const payload = {
+        ...newProduct,
+        price: Number(newProduct.price) || 0,
+        stock: Number(newProduct.stock) || 0,
+        features: Array.isArray(newProduct.features) ? newProduct.features : [],
+      };
+
       await fetch('/api/products', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(newProduct),
+        body: JSON.stringify(payload),
       });
-      setNewProduct({ name: '', sku: '', category: '', price: '', description: '', image: '', stock: '' });
+      setRawTitle('');
+      setNewProduct({
+        name: '',
+        sku: '',
+        category: 'Phone Case',
+        deviceBrand: '',
+        deviceModel: '',
+        caseType: '',
+        material: '',
+        features: [],
+        price: '',
+        description: '',
+        image: '',
+        stock: '',
+      });
       fetchProducts();
     } catch (error) {
       console.error('Failed to create product:', error);
@@ -123,25 +232,105 @@ export default function AdminDashboard() {
               <h2 className="text-lg font-semibold">Create Inventory Asset</h2>
             </div>
             <form onSubmit={handleCreateProduct} className="space-y-4">
-              {[
-                { name: 'name', placeholder: 'Product name' },
-                { name: 'sku', placeholder: 'SKU' },
-                { name: 'category', placeholder: 'Category' },
-                { name: 'price', placeholder: 'Price USD', type: 'number' },
-                { name: 'stock', placeholder: 'Stock', type: 'number' },
-                { name: 'image', placeholder: 'Image URL' },
-              ].map((field) => (
+              <textarea
+                name="rawTitle"
+                value={rawTitle}
+                onChange={handleRawTitleChange}
+                placeholder="Paste raw product title here to auto-populate case variant fields"
+                rows={4}
+                className="glass-input w-full rounded-3xl border border-white/10 bg-black/10 px-4 py-3 text-sm text-white"
+              />
+
+              <div className="grid gap-4 md:grid-cols-2">
                 <input
-                  key={field.name}
-                  type={field.type || 'text'}
-                  name={field.name}
-                  value={newProduct[field.name]}
-                  onChange={(event) => setNewProduct({ ...newProduct, [field.name]: event.target.value })}
-                  placeholder={field.placeholder}
-                  required={field.name !== 'image'}
+                  type="text"
+                  name="deviceBrand"
+                  value={newProduct.deviceBrand}
+                  onChange={(event) => setNewProduct({ ...newProduct, deviceBrand: event.target.value })}
+                  placeholder="Device brand"
                   className="glass-input w-full rounded-3xl border border-white/10 bg-black/10 px-4 py-3 text-sm text-white"
                 />
-              ))}
+                <input
+                  type="text"
+                  name="deviceModel"
+                  value={newProduct.deviceModel}
+                  onChange={(event) => setNewProduct({ ...newProduct, deviceModel: event.target.value })}
+                  placeholder="Device model"
+                  className="glass-input w-full rounded-3xl border border-white/10 bg-black/10 px-4 py-3 text-sm text-white"
+                />
+              </div>
+
+              <div className="grid gap-4 md:grid-cols-2">
+                <input
+                  type="text"
+                  name="caseType"
+                  value={newProduct.caseType}
+                  onChange={(event) => setNewProduct({ ...newProduct, caseType: event.target.value })}
+                  placeholder="Case type"
+                  className="glass-input w-full rounded-3xl border border-white/10 bg-black/10 px-4 py-3 text-sm text-white"
+                />
+                <input
+                  type="text"
+                  name="material"
+                  value={newProduct.material}
+                  onChange={(event) => setNewProduct({ ...newProduct, material: event.target.value })}
+                  placeholder="Material"
+                  className="glass-input w-full rounded-3xl border border-white/10 bg-black/10 px-4 py-3 text-sm text-white"
+                />
+              </div>
+
+              <input
+                type="text"
+                name="sku"
+                value={newProduct.sku}
+                onChange={(event) => setNewProduct({ ...newProduct, sku: event.target.value })}
+                placeholder="SKU"
+                required
+                className="glass-input w-full rounded-3xl border border-white/10 bg-black/10 px-4 py-3 text-sm text-white"
+              />
+
+              <div className="grid gap-4 md:grid-cols-2">
+                <input
+                  type="number"
+                  name="price"
+                  value={newProduct.price}
+                  onChange={(event) => setNewProduct({ ...newProduct, price: event.target.value })}
+                  placeholder="Price USD"
+                  required
+                  className="glass-input w-full rounded-3xl border border-white/10 bg-black/10 px-4 py-3 text-sm text-white"
+                />
+                <input
+                  type="number"
+                  name="stock"
+                  value={newProduct.stock}
+                  onChange={(event) => setNewProduct({ ...newProduct, stock: event.target.value })}
+                  placeholder="Stock"
+                  required
+                  className="glass-input w-full rounded-3xl border border-white/10 bg-black/10 px-4 py-3 text-sm text-white"
+                />
+              </div>
+
+              <input
+                type="text"
+                name="image"
+                value={newProduct.image}
+                onChange={(event) => setNewProduct({ ...newProduct, image: event.target.value })}
+                placeholder="Image URL"
+                className="glass-input w-full rounded-3xl border border-white/10 bg-black/10 px-4 py-3 text-sm text-white"
+              />
+
+              <input
+                type="text"
+                name="features"
+                value={Array.isArray(newProduct.features) ? newProduct.features.join(', ') : newProduct.features}
+                onChange={(event) => setNewProduct({
+                  ...newProduct,
+                  features: event.target.value.split(',').map((item) => item.trim()).filter(Boolean),
+                })}
+                placeholder="Features (comma separated)"
+                className="glass-input w-full rounded-3xl border border-white/10 bg-black/10 px-4 py-3 text-sm text-white"
+              />
+
               <textarea
                 name="description"
                 value={newProduct.description}
@@ -150,10 +339,37 @@ export default function AdminDashboard() {
                 rows={3}
                 className="glass-input w-full rounded-3xl border border-white/10 bg-black/10 px-4 py-3 text-sm text-white"
               />
+
               <button type="submit" className="w-full rounded-full bg-white text-black uppercase tracking-[0.18em] py-3 font-semibold hover:bg-zinc-200 transition">
                 Add product
               </button>
             </form>
+
+            <div className="mt-6 rounded-3xl border border-white/10 bg-white/5 p-5">
+              <p className="text-sm uppercase tracking-[0.28em] text-zinc-500">Parsed preview</p>
+              <div className="mt-4 grid gap-3 text-sm text-zinc-300">
+                <div>
+                  <span className="block text-zinc-500">Brand</span>
+                  <p className="mt-1 text-white">{newProduct.deviceBrand || 'N/A'}</p>
+                </div>
+                <div>
+                  <span className="block text-zinc-500">Model</span>
+                  <p className="mt-1 text-white">{newProduct.deviceModel || 'N/A'}</p>
+                </div>
+                <div>
+                  <span className="block text-zinc-500">Case type</span>
+                  <p className="mt-1 text-white">{newProduct.caseType || 'N/A'}</p>
+                </div>
+                <div>
+                  <span className="block text-zinc-500">Material</span>
+                  <p className="mt-1 text-white">{newProduct.material || 'N/A'}</p>
+                </div>
+                <div>
+                  <span className="block text-zinc-500">Features</span>
+                  <p className="mt-1 text-white">{Array.isArray(newProduct.features) && newProduct.features.length > 0 ? newProduct.features.join(', ') : 'N/A'}</p>
+                </div>
+              </div>
+            </div>
           </section>
 
           <section className="glass-panel rounded-3xl border border-white/10 p-6 overflow-hidden">

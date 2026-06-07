@@ -4,11 +4,20 @@ const ProductSchema = new mongoose.Schema({
   name: { type: String, required: true },
   sku: { type: String, required: true, unique: true },
   category: { type: String, required: true },
+  deviceBrand: { type: String, required: true },
+  deviceModel: { type: String, required: true },
+  caseType: { type: String, required: true },
+  material: { type: String, required: true },
+  features: { type: [String], default: [] },
   price: { type: Number, required: true },
   description: { type: String },
   image: {
     type: String,
     default: 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=800&q=80',
+  },
+  images: {
+    type: [String],
+    default: ['https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=800&q=80'],
   },
   stock: { type: Number, required: true, default: 10 },
 }, { timestamps: true });

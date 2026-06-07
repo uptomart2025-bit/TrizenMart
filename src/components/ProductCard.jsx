@@ -22,6 +22,14 @@ export default function ProductCard({ product }) {
           </div>
           <span className="text-sm font-bold text-white">${product.price}</span>
         </div>
+        <div className="flex flex-wrap gap-2">
+          <span className="rounded-full bg-emerald-300/10 px-3 py-1 text-[11px] uppercase tracking-[0.18em] text-emerald-200">
+            {product.caseType || 'Premium Case'}
+          </span>
+          <span className="rounded-full bg-white/5 px-3 py-1 text-[11px] uppercase tracking-[0.18em] text-zinc-300">
+            Supported: {product.deviceBrand ? `${product.deviceBrand} ${product.deviceModel}` : product.deviceModel || 'All'}
+          </span>
+        </div>
         <p className="text-sm leading-6 text-zinc-400 min-h-[3rem]">{product.description}</p>
         <button
           onClick={() => addToCart(product)}
